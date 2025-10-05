@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Local Intelligent Summarizer</title>
+  <style>
+    body { font-family: Arial; margin: 40px; background: #f5f7fa; }
+    textarea { width: 100%; height: 120px; font-size: 14px; padding: 10px; border-radius: 6px; border: 1px solid #ccc; }
+    button { margin-top: 10px; padding: 10px 16px; font-size: 16px; border: none; border-radius: 6px; background: #0078ff; color: white; cursor: pointer; }
+    button:hover { background: #005fcc; }
+    .result { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    .input-title { font-weight: bold; color: #0078ff; margin-bottom: 6px; }
+    select { margin-top: 10px; padding: 6px 10px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+  <h1>🧠 Local Intelligent Summarizer</h1>
+
+  <p>Enter URLs (one per line, optional):</p>
+  <textarea id="urls" placeholder="https://pmc.ncbi.nlm.nih.gov/articles/PMC11988870/"></textarea>
+
+  <p>Or paste text directly to summarize (one section per line, optional):</p>
+  <textarea id="texts" placeholder="Type or paste your text here..."></textarea>
+
+  <p>Select the maximum number of words for the summary:
+    <br>(Take into acount that the maximum limit of words can vary and that the AI model might not always would have reason)
+  </p>
+  <select id="max_words">
+    <option value="40">40</option>
+    <option value="60">60</option>
+    <option value="80" selected>80</option>
+    <option value="100">100</option>
+    <option value="150">150+</option>
+  </select>
+
+  <button onclick="resumir()">Summarize</button>
+
+  <div id="results"></div>
+
+  <script>
+    async function resumir() {
+      const urlsText = document.getElementById("urls").value.trim();
+      const textsText = document.getElementById("texts").value.trim();
+      const maxWords = parseInt(document.getElementById("max_words").value);
+      const resultsContainer = document.getElementById("results");
+      resultsContainer.innerHTML = "<p>Processing... ⏳</p>";
+
+      const urls = urlsText ? urlsText.split("\n").map(u => u.trim()).filter(u => u !== "") : [];
+      const texts = textsText ? textsText.split("\n").map(t => t.trim()).filter(t => t !== "") : [];
+
+      if(urls.length === 0 && texts.length === 0){
+        alert("Please enter at least one URL or text.");
+        resultsContainer.innerHTML = "";
+        return;
+      }
+
+      try {
+        const response = await fetch("http://127.0.0.1:8000/summarize/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls, texts, max_words: maxWords })
+        });
+
+        if (!response.ok) throw new Error("Error connecting to the server: " + response.status);
+
+        const data = await response.json();
+        resultsContainer.innerHTML = "";
+
+        data.results.forEach(r => {
+          const div = document.createElement("div");
+          div.className = "result";
+          div.innerHTML = `
+            <div class="input-title">${r.input}</div>
+            <p><strong>Full Summary:</strong> ${r.resumen_completo}</p>
+            <p><strong>Final Summary (max ${maxWords} words):</strong> ${r.resumen_final}</p>
+          `;
+          resultsContainer.appendChild(div);
+        });
+
+      } catch (error) {
+        resultsContainer.innerHTML = "<p style='color:red;'>❌ " + error.message + "</p>";
+      }
+    }
+  </script>
+</body>
+</html>
